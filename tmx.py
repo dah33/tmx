@@ -15,6 +15,7 @@ from xml.etree import ElementTree
 from base64 import b64decode
 from zlib import decompress as z_decompress
 from gzip import decompress as g_decompress
+from os import path as os_path
 
 
 class Tile(object):
@@ -64,7 +65,7 @@ class Tileset(object):
         self.properties = {}
 
     @classmethod
-    def fromxml(cls, tag, firstgid=None):
+    def fromxml(cls, tag, firstgid=None, file_path=''):
         if 'source' in tag.attrib:
             firstgid = int(tag.attrib['firstgid'])
             with open(tag.attrib['source']) as f:
@@ -82,7 +83,7 @@ class Tileset(object):
         for c in tag.getchildren():
             if c.tag == "image":
                 # create a tileset
-                tileset.add_image(c.attrib['source'])
+                tileset.add_image(os_path.join(file_path, c.attrib['source']))
             elif c.tag == 'tile':
                 gid = tileset.firstgid + int(c.attrib['id'])
                 tileset.get_tile(gid).loadxml(c)
@@ -737,7 +738,7 @@ class TileMap(object):
         tilemap.px_height = tilemap.height * tilemap.tile_height
 
         for tag in map.findall('tileset'):
-            tilemap.tilesets.add(Tileset.fromxml(tag))
+            tilemap.tilesets.add(Tileset.fromxml(tag, file_path=os_path.dirname(filename)))
 
         for tag in map.findall('layer'):
             layer = Layer.fromxml(tag, tilemap)
