@@ -13,7 +13,8 @@ from pygame.locals import *
 from pygame import Rect
 from xml.etree import ElementTree
 from base64 import b64decode
-from zlib import decompress
+from zlib import decompress as z_decompress
+from gzip import decompress as g_decompress
 
 
 class Tile(object):
@@ -251,15 +252,30 @@ class Layer(object):
     def fromxml(cls, tag, map):
         layer = cls(tag.attrib['name'], int(tag.attrib.get('visible', 1)), map)
 
-        data = tag.find('data')
-        if data is None:
+        lr_data = tag.find('data')
+
+        if lr_data is None:
             raise ValueError('layer %s does not contain <data>' % layer.name)
 
-        data = data.text.strip()
-        data = data.encode() # Convert to bytes
-        # Decode from base 64 and decompress via zlib 
-        data = decompress(b64decode(data)) 
-        data = struct.unpack('<%di' % (len(data)/4,), data)
+        data = lr_data.text.strip()
+
+        if data == '':  # If no text in data, than it plian XML
+            data = tuple([int(tile.attrib['gid']) for tile in lr_data])  # Convert XML to tuple
+
+        else:
+            b64_b_data = b64decode(data)  # Decode from Base64
+
+            if 'compression' in lr_data.attrib:  # Is it compressed?
+
+                    if lr_data.attrib['compression'] == 'zlib':
+                        b64_b_data = z_decompress(b64_b_data)
+
+                    elif lr_data.attrib['compression'] == 'gzip':
+                        b64_b_data = g_decompress(b64_b_data)
+
+            fmt = '<%dI' % (len(b64_b_data) // struct.calcsize('<I'))
+            data = struct.unpack(fmt, b64_b_data)
+
         assert len(data) == layer.width * layer.height
         for i, gid in enumerate(data):
             if gid < 1: continue   # not set
